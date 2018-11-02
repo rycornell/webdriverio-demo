@@ -6,68 +6,16 @@
 function runner() {
   const fs = require('fs');
   const maxRetries = 2;
-  let attempts = 0;
   const confFile = `${new Date().getTime()}.conf.js`;
+  let attempts = 0;
+  let wdioCommand = `wdio ${confFile} ${process.argv.slice(2).join(' ')}`;
 
-  processArgs();
-  runWdio(process.argv.slice(2).join(' '));
+  runWdio();
 
-  function processArgs() {
-    const merge = require('lodash.mergewith');
-    let env = '';
-    const services = [];
-
-    if (process.argv) {
-      if (process.argv.some(a => a === '--dev')) {
-        env = 'dev';
-      }
-
-      if (process.argv.some(a => a === '--prod')) {
-        env = 'prod';
-      }
-
-      if (process.argv.some(a => a === '--sauce')) {
-        services.push('sauce');
-      }
-
-      if (process.argv.some(a => a === '--headless')) {
-        services.push('headless');
-      }
-    }
-
-    // load default config
-    let config = require(`./wdio.conf`).config;
-
-    // merge environment config
-    if (env) {
-      log(`Using ${env} configuration ***`);
-      config = merge(config, require(`./wdio.${env}.conf`).config);
-    } else {
-      log(`Using default configuration`);
-    }
-
-    // merge service config
-    for (let i = 0; i < services.length; i++) {
-      log(`Using ${services[i]} service configuration`);
-      config = merge(config, require(`./wdio.${services[i]}.conf`).config, function(objValue, srcValue) {
-        return srcValue;
-      });
-    }
-
-    // generate conf file
-    fs.writeFileSync(confFile, 'exports.config  = ' + JSON.stringify(config, function(k, v) {
-      return (typeof v === 'function' ) ? v.toString() : v;
-    })
-    .replace(/\\r\\n/g, '\r\n')
-    .replace(/"function/g, 'function')
-    .replace(/"async function/g, 'async function')
-    .replace(/}",/g, '},'));
-  }
-
-  function runWdio(args: String = '', specs: String[] = []) {
-    attempts++;
-    let wdioCommand = `wdio ${confFile} ${args}`;
+  function runWdio(specs: String[] = []) {
     let output = '';
+    attempts++;
+    buildConfFile();
 
     if (specs && specs.length > 0) {
       wdioCommand += ' --spec ' + specs.join(',');
@@ -105,7 +53,7 @@ function runner() {
 
       if (retry) {
           log(`Re-running Failed Specs (attempt #${attempts + 1})`);
-          runWdio(args, failedSpecs);
+          runWdio(failedSpecs);
       } else {
         fs.access(confFile, fs.constants.F_OK, (err) => {
           if (!err) {
@@ -115,6 +63,59 @@ function runner() {
         });
       }
     });
+  }
+
+  function buildConfFile() {
+    const merge = require('lodash.mergewith');
+    let env = '';
+    const services = [];
+
+    if (process.argv) {
+      if (process.argv.some(a => a === '--dev')) {
+        env = 'dev';
+      }
+
+      if (process.argv.some(a => a === '--prod')) {
+        env = 'prod';
+      }
+
+      if (process.argv.some(a => a === '--sauce')) {
+        services.push('sauce');
+      }
+
+      if (process.argv.some(a => a === '--headless')) {
+        services.push('headless');
+      }
+    }
+
+    // load default config and append the number of attempts for logging
+    let config = require(`./wdio.conf`).config;
+    config.attempts = attempts;
+
+    // merge environment config
+    if (env) {
+      log(`Using ${env} configuration`);
+      config = merge(config, require(`./wdio.${env}.conf`).config);
+    } else {
+      log(`Using default configuration`);
+    }
+
+    // merge service config and make sure arrays are overwritten
+    for (let i = 0; i < services.length; i++) {
+      log(`Using ${services[i]} service configuration`);
+      config = merge(config, require(`./wdio.${services[i]}.conf`).config, function(objValue, srcValue) {
+        return srcValue;
+      });
+    }
+
+    // generate wdio conf file and handle functions within the JSON
+    fs.writeFileSync(confFile, 'exports.config  = ' + JSON.stringify(config, function(k, v) {
+      return (typeof v === 'function' ) ? v.toString() : v;
+    })
+    .replace(/\\r\\n/g, '\r\n')
+    .replace(/"function/g, 'function')
+    .replace(/"async function/g, 'async function')
+    .replace(/}"/g, '}'));
   }
 
   function parseJunitOutput(text) {
