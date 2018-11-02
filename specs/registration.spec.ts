@@ -1,4 +1,4 @@
-import { config } from '../wdio.conf';
+import config from '../browser-helpers';
 import registration from '../pages/registration';
 
 describe('Registration', () => {

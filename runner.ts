@@ -4,12 +4,13 @@
  * */
 
 function runner() {
-  const fs = require('fs');
+  const fs = require('fs-extra');
   const maxRetries = 2;
   const confFile = `${new Date().getTime()}.conf.js`;
   let attempts = 0;
   let wdioCommand = `wdio ${confFile} ${process.argv.slice(2).join(' ')}`;
 
+  deleteTestResults();
   runWdio();
 
   function runWdio(specs: String[] = []) {
@@ -55,12 +56,8 @@ function runner() {
           log(`Re-running Failed Specs (attempt #${attempts + 1})`);
           runWdio(failedSpecs);
       } else {
-        fs.access(confFile, fs.constants.F_OK, (err) => {
-          if (!err) {
-            log('Deleting temporary config file');
-            fs.unlinkSync(confFile);
-          }
-        });
+        log('Deleting temporary config file');
+        fs.removeSync(confFile);
       }
     });
   }
@@ -109,7 +106,7 @@ function runner() {
     }
 
     // generate wdio conf file and handle functions within the JSON
-    fs.writeFileSync(confFile, 'exports.config  = ' + JSON.stringify(config, function(k, v) {
+    fs.outputFileSync(confFile, 'exports.config  = ' + JSON.stringify(config, function(k, v) {
       return (typeof v === 'function' ) ? v.toString() : v;
     })
     .replace(/\\r\\n/g, '\r\n')
@@ -141,6 +138,11 @@ function runner() {
     }
 
     return failedSpecs;
+  }
+
+  function deleteTestResults() {
+    log('Deleting old test results');
+    fs.removeSync('testresults');
   }
 
   function log(message) {

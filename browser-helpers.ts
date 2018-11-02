@@ -1,11 +1,12 @@
-import { config } from './wdio.conf';
 import { Client, RawResult, Element } from 'webdriverio';
 
 class BrowserHelpers {
 
-    private log = () => {
+    public log = () => {
         console.log(`${new Date().toISOString()} *** CURRENT URL : ${browser.getUrl()} ***`);
     }
+
+    public get testData() { return browser.options['testData']; }
 
     public go = (url: string) => {
         console.log(`*** NAVIGATING TO : ${url} ***`);
@@ -56,7 +57,7 @@ class BrowserHelpers {
         this.log();
         this.waitUntil(() => {
             if (element().isVisible() === true) {
-                element().waitForVisible(config.waitforTimeout, true);
+                element().waitForVisible(browser.options.waitforTimeout, true);
                 return false;
             }
             return true;
@@ -124,6 +125,11 @@ class BrowserHelpers {
                 return false;
             }
         });
+    }
+
+    public withFrame = (id: string) => {
+        this.log();
+        return browser.frame(id);
     }
 }
 
